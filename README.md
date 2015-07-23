@@ -28,8 +28,8 @@ Usage
 Requirements
 ============
 
- To successfully compile cFDAP the GNU Scientific Library
-(http://www.gnu.org/software/gsl/) must be installed.
+ To successfully compile cFDAP you need to install the GNU Scientific Library
+(http://www.gnu.org/software/gsl/).
 
 Coping
 ======
