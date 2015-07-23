@@ -42,4 +42,6 @@ TODO
 
  * support of models with a different number of fit parameters
  * calculation of confidence intervals
+ * statically linked GSL
+ * cFDAP version for Windows 7
  * a simple GUI (preferably a Fiji plugin)
