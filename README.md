@@ -31,7 +31,7 @@ Requirements
  To successfully compile cFDAP you need to install the GNU Scientific Library
 (http://www.gnu.org/software/gsl/).
 
-Coping
+Copying
 ======
 
  cFDAP is licensed under a GPL license. That means that distributing the code is only
