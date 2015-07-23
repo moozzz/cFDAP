@@ -7,7 +7,7 @@ cFDAP
 kinetic parameters from FRAP/FDAP data gathered from living neuronal cells.
 However, the code can be relatively simply adapted to any experiment outline,
 which, in turn, requires theoretical expressions for FRAP(t)/FDAP(t) signals be
-hardcoded explicitly (for more details please Igaev et al. (2015) Biophys. J.
+hardcoded explicitly (for more details please read Igaev et al. (2015) Biophys. J.
 107: 2567-2578).
 
 Compilation
