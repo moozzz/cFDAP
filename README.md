@@ -1,5 +1,5 @@
-cFDAP
-=====
+cFDAP v.0.1.0
+=============
 
  cFDAP is a command-line Linux tool for fitting FRAP/FDAP data.
 
@@ -36,3 +36,10 @@ Coping
 
  cFDAP is licensed under a GPL license. That means that distributing the code is only
 allowed under the same terms. 
+
+TODO
+====
+
+ * support of models with a different number of fit parameters
+ * calculation of confidence intervals
+ * a simple GUI (preferably a Fiji plugin)
