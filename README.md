@@ -14,6 +14,7 @@ New
 ===
 
  * 12.08.2015
+
    cFDAP now supports kinetic models with 1 and 2 fit parameters and and
    calculates 95%, 97.5% and 99.9% confidence intervals!
 
