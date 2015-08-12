@@ -4,11 +4,17 @@ cFDAP v.0.1.0
  cFDAP is a command-line Linux tool for fitting FRAP/FDAP data.
 
  The overall goal of cFDAP is to provide a fast and robust way to extract
-kinetic parameters from FRAP/FDAP data gathered from living neuronal cells.
-However, the code can be relatively simply adapted to any experiment outline,
-which, in turn, requires theoretical expressions for FRAP(t)/FDAP(t) signals be
-hardcoded explicitly (for more details please read Igaev et al. (2015) Biophys. J.
-107: 2567-2578).
+kinetic parameters from FRAP/FDAP data gathered from outgrowths of living
+neuronal cells. Nevetheless, the code can be relatively simply adapted to any
+experiment outline, which, in turn, requires theoretical expressions for
+FRAP(t)/FDAP(t) signals be hardcoded explicitly (for more details please
+read Igaev et al. (2015) Biophys. J. 107: 2567-2578).
+
+New
+===
+
+ * 12.08.2015: cFDAP now supports kinetic models with 1 and 2 fit parameters and
+   and calculates 95%, 97.5% and 99.9% confidence intervals!
 
 Compilation
 ===========
@@ -40,8 +46,6 @@ allowed under the same terms.
 TODO
 ====
 
- * support of models with a different number of fit parameters
- * calculation of confidence intervals
  * statically linked GSL
  * cFDAP version for Windows 7
  * a simple GUI (preferably a Fiji plugin)

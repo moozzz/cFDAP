@@ -15,6 +15,7 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multifit_nlin.h>
+#include <gsl/gsl_cdf.h>
 
 /* Global variables */
 #ifndef M_PI
@@ -29,6 +30,7 @@
 #define DEFAULT_N 113 /* Number of points in the curves */
 #define DEFAULT_KON_INIT 0.5 /* Starting value for kon */
 #define DEFAULT_KOFF_INIT 0.5 /* Starting value for koff */
+#define DEFAULT_XX_INIT 1.0 /* Starting value for xx = kon/koff */
 
 /* MACROS */
 #define NELEMS_1D(x) (sizeof(x)/sizeof((x)[0]))
@@ -45,6 +47,7 @@ struct data {
     double * y;
     double * sigma;
     char * m;
+    size_t p;
 };
 
 /* FUNCTION DECLARATIONS */
@@ -70,12 +73,14 @@ double complex hybridModel_kon(double complex s, double kon,
                                double koff, double Df, double R);
 double complex hybridModel_koff(double complex s, double kon,
                                 double koff, double Df, double R);
-double invlap(double t, double kon, double koff,
-              double Df, double R, char *m, int functionOrDerivative);
+double invlap_1(double t, double xx, double Df,
+                double R, char *m, int functionOrDerivative);
+double invlap_2(double t, double kon, double koff,
+                double Df, double R, char *m, int functionOrDerivative);
 int model_f(const gsl_vector * x, void *data, gsl_vector * f);
 int model_df(const gsl_vector * x, void *data, gsl_matrix * J);
 int model_fdf (const gsl_vector * x, void *data, gsl_vector * f, gsl_matrix * J);
-void print_state (size_t iter, gsl_multifit_fdfsolver * s);
+void print_state (size_t iter, gsl_multifit_fdfsolver * s, size_t p);
 void bad_input(void);
 
 /* FUNCTIONS */
@@ -98,15 +103,15 @@ fullModel_koff(double complex s, double kon, double koff, double Df, double R) {
 }
 
 double complex
-effectiveDiffusion(double complex s, double x, double Df, double R) {
+effectiveDiffusion(double complex s, double xx, double Df, double R) {
     /* x = kon/koff */
-    return 1.0/s - 1.0/2.0/s/csqrt(R*R*s*(1.0 + x)/Df)*(1.0 - cexp(-2.0*csqrt(R*R*s*(1.0 + x)/Df)));
+    return 1.0/s - 1.0/2.0/s/csqrt(R*R*s*(1.0 + xx)/Df)*(1.0 - cexp(-2.0*csqrt(R*R*s*(1.0 + xx)/Df)));
 }
 
 double complex
-effectiveDiffusion_x(double complex s, double x, double Df, double R) {
+effectiveDiffusion_xx(double complex s, double xx, double Df, double R) {
     /* x = kon/koff */
-    return (1.0 - (1.0 + 2.0*csqrt(s*R*R/Df*(1.0 + x)))*cexp(-2.0*csqrt(s*R*R/Df*(1.0 + x))))/(4.0*s*(1.0 + x)*csqrt(s*R*R/Df*(1.0 + x)));
+    return (1.0 - (1.0 + 2.0*csqrt(s*R*R/Df*(1.0 + xx)))*cexp(-2.0*csqrt(s*R*R/Df*(1.0 + xx))))/(4.0*s*(1.0 + xx)*csqrt(s*R*R/Df*(1.0 + xx)));
 }
 
 double complex
@@ -166,7 +171,44 @@ hybridModel_koff(double complex s, double kon, double koff, double Df, double R)
   
    Modified by Maxim Igaev, 2015 */
 double
-invlap(double t, double kon, double koff, double Df, double R, char *m, int functionOrDerivative) {
+invlap_1(double t, double xx, double Df, double R, char *m, int functionOrDerivative) {
+    /* defining constants */
+    int i, n_int = 10000;
+    double omega = 200.0, sigma = 0.05, delta = omega/((double) n_int);
+    double sum = 0.0, wi = 0.0, wf, fi, ff;
+    double complex witi, wfti; 
+
+    /* loading one of the laplace image functions */
+    double complex (*laplace_fun)();
+    if (strcmp(m, "effectiveDiffusion") == 0) {
+        if (functionOrDerivative == 0) {
+            laplace_fun = &effectiveDiffusion;
+        }
+        else if (functionOrDerivative == 1) {
+            laplace_fun = &effectiveDiffusion_xx;
+        }
+        else {
+            fprintf(stderr, "ERROR: in 'invlap_1': functionOrDerivative takes only values 0 or 1 for the model and derivative, respectively.");
+        }
+    }
+
+    for(i = 0; i < n_int; i++) {
+        witi = 0.0 + (wi*t)*I;
+
+        wf = wi + delta;
+        wfti = 0.0 + (wf*t)*I;
+
+        fi = creal(cexp(witi)*laplace_fun(sigma + wi*I, xx, Df, R));
+        ff = creal(cexp(wfti)*laplace_fun(sigma + wf*I, xx, Df, R));
+        sum += 0.5*(wf - wi)*(fi + ff);
+        wi = wf;
+    }
+
+    return creal(sum*cexp(sigma*t)/M_PI);
+}
+
+double
+invlap_2(double t, double kon, double koff, double Df, double R, char *m, int functionOrDerivative) {
     /* defining constants */
     int i, n_int = 10000;
     double omega = 200.0, sigma = 0.05, delta = omega/((double) n_int);
@@ -186,18 +228,7 @@ invlap(double t, double kon, double koff, double Df, double R, char *m, int func
             laplace_fun = &fullModel_koff;
         }
         else {
-            fprintf(stderr, "ERROR: invlap takes only values 0, 1 or 2 for the model and derivatives, respectively.");
-        }
-    }
-    else if (strcmp(m, "effectiveDiffusion") == 0) {
-        if (functionOrDerivative == 0) {
-            laplace_fun = &effectiveDiffusion;
-        }
-        else if (functionOrDerivative == 1) {
-            laplace_fun = &effectiveDiffusion_x;
-        }
-        else {
-            fprintf(stderr, "ERROR: effectiveDiffusion model has only one fit parameter x.");
+            fprintf(stderr, "ERROR: in 'invlap_2': functionOrDerivative takes only values 0, 1 or 2 for the model and derivatives, respectively.");
         }
     }
     else if (strcmp(m, "hybridModel") == 0) {
@@ -211,7 +242,7 @@ invlap(double t, double kon, double koff, double Df, double R, char *m, int func
             laplace_fun = &hybridModel_koff;
         }
         else {
-            fprintf(stderr, "ERROR: invlap takes only values 0, 1 or 2 for the model and derivatives, respectively.");
+            fprintf(stderr, "ERROR: in 'invlap_2': functionOrDerivative takes only values 0, 1 or 2 for the model and derivatives, respectively.");
         }
     }
     else if (strcmp(m, "reactionDominantPure") == 0) {
@@ -225,7 +256,7 @@ invlap(double t, double kon, double koff, double Df, double R, char *m, int func
             laplace_fun = &reactionDominantPure_koff;
         }
         else {
-            fprintf(stderr, "ERROR: invlap takes only values 0, 1 or 2 for the model and derivatives, respectively.");
+            fprintf(stderr, "ERROR: in 'invlap_2': functionOrDerivative takes only values 0, 1 or 2 for the model and derivatives, respectively.");
         }
     }
 
@@ -254,24 +285,46 @@ model_f (const gsl_vector * x, void *data,
     double *y = ((struct data *)data)->y;
     double *sigma = ((struct data *) data)->sigma;
     char *m = ((struct data *) data)->m;
-
-    double kon = gsl_vector_get (x, 0);
-    double koff = gsl_vector_get (x, 1);
+    size_t p = ((struct data *)data)->p;
 
     size_t i;
+    double xx, kon, koff;
 
-    /* Importing one of the model functions */    
-    double (*inverted_fun)();
-    inverted_fun = &invlap;
-    //char m[] = "fullModel";
+    if (p == 1) {
+        xx = gsl_vector_get (x, 0);
 
-    for (i = 0; i < n; i++) {
-        /* Model Yi = A * exp(-lambda * i) + b */
-        //double Yi = A * exp (-lambda * t) + b;
+        /* Importing one of the model functions */    
+        double (*inverted_fun)();
+        inverted_fun = &invlap_1;
 
-        double Yi = inverted_fun(time[i], kon, koff, Df, R, m, 0);
-        gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+        for (i = 0; i < n; i++) {
+            /* Model Yi = A * exp(-lambda * i) + b */
+            //double Yi = A * exp (-lambda * t) + b;
+            double Yi = inverted_fun(time[i], xx, Df, R, m, 0);
+            gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+        }
     }
+    else if (p == 2) {
+        kon = gsl_vector_get (x, 0);
+        koff = gsl_vector_get (x, 1);
+
+        /* Importing one of the model functions */    
+        double (*inverted_fun)();
+        inverted_fun = &invlap_2;
+
+        for (i = 0; i < n; i++) {
+            /* Model Yi = A * exp(-lambda * i) + b */
+            //double Yi = A * exp (-lambda * t) + b;
+            double Yi = inverted_fun(time[i], kon, koff, Df, R, m, 0);
+            gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+        }
+    }
+    else {
+        fprintf(stderr, "ERROR: in 'model_f': Parameter p is neither 1 nor 2.\n");
+        exit(1);
+    }
+
+
 
     return GSL_SUCCESS;
 }
@@ -285,25 +338,48 @@ model_df(const gsl_vector * x, void *data,
     double *time = ((struct data *) data)->time;
     double *sigma = ((struct data *) data)->sigma;
     char *m = ((struct data *) data)->m;
-
-    double kon = gsl_vector_get (x, 0);
-    double koff = gsl_vector_get (x, 1);
+    size_t p = ((struct data *)data)->p;
 
     size_t i;
+    double xx, kon, koff;
 
-    /* Importing one of the model functions */    
-    double (*inverted_fun)();
-    inverted_fun = &invlap;
-    //char m[] = "fullModel";
+    if (p == 1) {
+        xx = gsl_vector_get (x, 0); 
 
-    for (i = 0; i < n; i++) {
-        /* Jacobian matrix J(i,j) = dfi / dxj, */
-        /* where fi = (Yi - yi)/sigma[i],      */
-        /*       Yi = A * exp(-lambda * i) + b  */
-        /* and the xj are the parameters (A,lambda,b) */
+        /* Importing one of the model functions */    
+        double (*inverted_fun)();
+        inverted_fun = &invlap_1;
 
-        gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1)/sigma[i]);
-        gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2)/sigma[i]);
+        for (i = 0; i < n; i++) {
+            /* Jacobian matrix J(i,j) = dfi / dxj, */
+            /* where fi = (Yi - yi)/sigma[i],      */
+            /*       Yi = A * exp(-lambda * i) + b  */
+            /* and the xj are the parameters (A,lambda,b) */
+
+            gsl_matrix_set (J, i, 0, inverted_fun(time[i], xx, Df, R, m, 1)/sigma[i]);
+        }
+    }
+    else if (p == 2) {
+        kon = gsl_vector_get (x, 0);
+        koff = gsl_vector_get (x, 1);
+
+        /* Importing one of the model functions */    
+        double (*inverted_fun)();
+        inverted_fun = &invlap_2;
+
+        for (i = 0; i < n; i++) {
+            /* Jacobian matrix J(i,j) = dfi / dxj, */
+            /* where fi = (Yi - yi)/sigma[i],      */
+            /*       Yi = A * exp(-lambda * i) + b  */
+            /* and the xj are the parameters (A,lambda,b) */
+
+            gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1)/sigma[i]);
+            gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2)/sigma[i]);
+        }
+    }
+    else {
+        fprintf(stderr, "ERROR: in 'model_f': Parameter p is neither 1 nor 2.\n");
+        exit(1);
     }
 
     return GSL_SUCCESS;
@@ -319,33 +395,47 @@ model_fdf(const gsl_vector * x, void *data,
 }
 
 void
-print_state (size_t iter, gsl_multifit_fdfsolver * s) {
-    printf ("iter: %3u x = % 15.8f % 15.8f "
-            "|f(x)| = %g\n",
-            iter,
-            gsl_vector_get (s->x, 0),
-            gsl_vector_get (s->x, 1),
-            gsl_blas_dnrm2 (s->f));
+print_state (size_t iter, gsl_multifit_fdfsolver * s, size_t p) {
+    if (p == 1) {
+        printf ("iter: %3u xx = % 15.8f "
+                "|f(x)| = %g\n",
+                iter,
+                gsl_vector_get (s->x, 0),
+                gsl_blas_dnrm2 (s->f));
+    }
+    else if (p == 2) {
+        printf ("iter: %3u x = % 15.8f % 15.8f "
+                "|f(x)| = %g\n",
+                iter,
+                gsl_vector_get (s->x, 0),
+                gsl_vector_get (s->x, 1),
+                gsl_blas_dnrm2 (s->f));
+    }
+    else {
+        fprintf(stderr, "ERROR: in 'print_state': Parameter p is neither 1 nor 2.\n");
+        exit(1);
+    }
 }
 
 void
 bad_input(void) {
-    fprintf(stderr, "Usage: cFDAP [-d diffusion_constant] [-r2 half_activation_area]\n");
-    fprintf(stderr, "             [-m model_type] [-tini initial_time]\n");
+    fprintf(stderr, "Usage: cFDAP [-m model_type] [-d diffusion_constant]\n");
+    fprintf(stderr, "             [-r2 half_activation_area] [-tini initial_time]\n");
     fprintf(stderr, "             [-tend end_time] [-n numsteps]\n");
     fprintf(stderr, "             [-kon0 initial_kon] [-koff0 initial_koff]\n");
-    fprintf(stderr, "             [-i input] [-sd standard_deviation]\n");
-    fprintf(stderr, "             [-o output]\n\n");
+    fprintf(stderr, "             [-x0 initial_x] [-i input]\n");
+    fprintf(stderr, "             [-sd standard_deviation] [-o output]\n\n");
+    fprintf(stderr, "  model_type:             reaction-diffusion model to fit with (mandatory parameter):\n");
+    fprintf(stderr, "                          fullModel, hybridModel,\n");
+    fprintf(stderr, "                          reactionDominantPure, effectiveDiffusion\n");
     fprintf(stderr, "  diffusion_constant:     diffusion constant of unbound proteins (default: 11.0 µm2/s)\n");
     fprintf(stderr, "  half_activation_area:   half length of the activation area (default: 3.0 µm)\n");
-    fprintf(stderr, "  model_type:             reaction-diffusion model to fit with:\n");
-    fprintf(stderr, "                          fullModel (default), hybridModel,\n");
-    fprintf(stderr, "                          reactionDominantPure, effectiveDiffusion\n");
     fprintf(stderr, "  initial_time:           initial time in the curve duration range (default: 0.0 s)\n");
     fprintf(stderr, "  end_time:               end time in the curve duration range (default: 112.0 s)\n");
     fprintf(stderr, "  numsteps:               number of steps in the FDAP curve (default: 113)\n");
-    fprintf(stderr, "  kon0:                   starting value for kon (default: 0.5)\n");
-    fprintf(stderr, "  koff0:                  starting value for koff (default: 0.5)\n");
+    fprintf(stderr, "  initial_x:              starting value for x = kon/koff (default: 1.0)\n");
+    fprintf(stderr, "  initial_kon:            starting value for kon (default: 0.5)\n");
+    fprintf(stderr, "  initial_koff:           starting value for koff (default: 0.5)\n");
     fprintf(stderr, "  input:                  name of input curve file (mandatory)\n");
     fprintf(stderr, "  standard_error:         name of input SD file (mandatory)\n");
     fprintf(stderr, "  output:                 prefix name of output file (Example: -o tau441wt\n");
@@ -367,14 +457,15 @@ main(int argc, char *argv[]) {
     unsigned int iter = 0;
 
     /* DEFAULTS */
-    char m[] = "fullModel";
+    char m[80];
     char curve_name[80], std_name[80], output_prefix[80];
     curve_name[0] = 0; std_name[0] = 0; output_prefix[0] = 0;
-    //const size_t n = DEFAULT_N;
-    int n = DEFAULT_N;
+    size_t p;
+    size_t n = DEFAULT_N;
     double Df = DEFAULT_DF, R = DEFAULT_R;
     double t_ini = DEFAULT_T_INI, t_end = DEFAULT_T_END;
-    double x_init[2] = { DEFAULT_KON_INIT, DEFAULT_KOFF_INIT };
+    double x_init_1[1] = { DEFAULT_XX_INIT };
+    double x_init_2[2] = { DEFAULT_KON_INIT, DEFAULT_KOFF_INIT };
 
     fprintf(stderr, "\n");
     fprintf(stderr, "  --------------   cFDAP 0.1.0 (C) 2015\n");
@@ -385,13 +476,13 @@ main(int argc, char *argv[]) {
     fprintf(stderr, "  --------------   Email: maxim.igaev@biologie.uni-osnabrueck.de\n");
     fprintf(stderr, "\n");
 
-    if ((argc < 2) || (argc > 22)) {
+    if ((argc < 2) || (argc > 23)) {
         bad_input();
     }
 
     /* First, a model must be chosen */
     if(strcmp(argv[1], "-m") != 0) {
-        fprintf(stderr, "ERROR: Firstly, a model must be chosen.\n\n");
+        fprintf(stderr, "ERROR: First, a model must be chosen.\n\n");
         exit(1);
     }
     else {
@@ -404,11 +495,11 @@ main(int argc, char *argv[]) {
                strcmp(argv[2], "hybridModel") == 0 ||
                strcmp(argv[2], "reactionDominantPure") == 0) {
                 strcpy(m, argv[2]);
+                p = 2;
             }
             else if(strcmp(argv[2], "effectiveDiffusion") == 0) {
-                //strcpy(m, argv[2]);
-                fprintf(stderr, "ERROR: '%s' model is not supported so far.\n\n", argv[2]);
-                exit(1);
+                strcpy(m, argv[2]);
+                p = 1;
             }
             else {
                 fprintf(stderr, "ERROR: Unknown model '%s'\n\n", argv[2]);
@@ -417,7 +508,7 @@ main(int argc, char *argv[]) {
         }
     }
 
-    /* Optional parameters */
+    /* Parameters */
     for(i = 2; i < argc; i++) {
         if(strcmp(argv[i], "-d") == 0) {
             if(i == argc - 1) {
@@ -443,26 +534,50 @@ main(int argc, char *argv[]) {
                 exit(1);
             }
         }
+        else if(strcmp(argv[i], "-x0") == 0) {
+            if(p != 1) {
+                fprintf(stderr, "ERROR: The model you chose has two fit parameters.\n\n");
+                exit(1);
+            }
+            if(i == argc - 1) {
+                fprintf(stderr, "ERROR: Missing initial value for x0.\n\n");
+                exit(1);
+            }
+            x_init_1[0] = atof(argv[i + 1]);
+            i++;
+            if(x_init_1[0] < 0.0) {
+                fprintf(stderr, "ERROR: Would a negative x make sense?\n\n");
+                exit(1);
+            }
+        }
         else if(strcmp(argv[i], "-kon0") == 0) {
+            if(p != 2) {
+                fprintf(stderr, "ERROR: The model you chose has one fit parameter.\n\n");
+                exit(1);
+            }
             if(i == argc - 1) {
                 fprintf(stderr, "ERROR: Missing initial value for kon0.\n\n");
                 exit(1);
             }
-            x_init[0] = atof(argv[i + 1]);
+            x_init_2[0] = atof(argv[i + 1]);
             i++;
-            if(x_init[0] < 0.0) {
+            if(x_init_2[0] < 0.0) {
                 fprintf(stderr, "ERROR: Would a negative kon make sense?\n\n");
                 exit(1);
             }
         }
         else if(strcmp(argv[i], "-koff0") == 0) {
+            if(p != 2) {
+                fprintf(stderr, "ERROR: The model you chose has one fit parameter.\n\n");
+                exit(1);
+            }
             if(i == argc - 1) {
                 fprintf(stderr, "ERROR: Missing initial value for koff0.\n\n");
                 exit(1);
             }
-            x_init[1] = atof(argv[i + 1]);
+            x_init_2[1] = atof(argv[i + 1]);
             i++;
-            if(x_init[1] < 0.0) {
+            if(x_init_2[1] < 0.0) {
                 fprintf(stderr, "ERROR: Would a negative koff make sense?\n\n");
                 exit(1);
             }
@@ -541,17 +656,27 @@ main(int argc, char *argv[]) {
         exit(1);
     }
 
-    const size_t p = 2;
     double time[n], y[n], sigma[n], best_fit[n];
     double stepSize = (t_end - t_ini)/(double) (n - 1);
     const gsl_multifit_fdfsolver_type *T;
     gsl_multifit_fdfsolver *s;
     gsl_matrix *covar = gsl_matrix_alloc (p, p); /* Covariance matrix */
 
-    struct data d = { n, Df, R, time, y, sigma, m };
+    struct data d = { n, Df, R, time, y, sigma, m, p };
 
     gsl_multifit_function_fdf f;
-    gsl_vector_view x = gsl_vector_view_array (x_init, p);
+    gsl_vector_view x;
+    if (p == 1) {
+        x = gsl_vector_view_array (x_init_1, p);
+    }
+    else if (p == 2)
+    {
+        x = gsl_vector_view_array (x_init_2, p);
+    }
+    else {
+        fprintf(stderr, "ERROR: in main: Parameter p is neither 1 nor 2.\n");
+        exit(1);
+    }
 
     f.f = &model_f;
     f.df = &model_df;
@@ -581,7 +706,7 @@ main(int argc, char *argv[]) {
     s = gsl_multifit_fdfsolver_alloc (T, n, p);
     gsl_multifit_fdfsolver_set (s, &f, &x.vector);
 
-    print_state (iter, s);
+    print_state (iter, s, p);
 
     do {
         iter++;
@@ -589,7 +714,7 @@ main(int argc, char *argv[]) {
 
         printf ("current status = %s\n", gsl_strerror (status));
 
-        print_state (iter, s);
+        print_state (iter, s, p);
 
         if (status)
             break;
@@ -608,19 +733,43 @@ main(int argc, char *argv[]) {
         double dof = n - p;
         double c = GSL_MAX_DBL(1, chi / sqrt(dof));
 
-        printf("\nchisq/dof = %g\n",  pow(chi, 2.0) / dof);
-        printf ("kon        = %.5f +/- %.5f\n", FIT(0), c*ERR(0));
-        printf ("koff       = %.5f +/- %.5f\n", FIT(1), c*ERR(1));
-        printf ("bound      = %.5f +/- %.5f\n", 100.0 - 100.0/(1.0 + FIT(0)/FIT(1)), 100.0*(c*ERR(0)/FIT(1) - FIT(0)*c*ERR(1)/FIT(1)/FIT(1))/(1.0 + FIT(0)/FIT(1))/(1.0 + FIT(0)/FIT(1)));
+        if (p == 1) {
+            printf("\nchisq/dof = %g\n",  pow(chi, 2.0) / dof);
+            printf ("x          = %.5f +/- %.5f\n", FIT(0), c*ERR(0));
+            printf ("x conf     = +/- %.5f %.5f %.5f\n", c*ERR(0)*gsl_cdf_tdist_Pinv(0.95, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.975, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.99, dof));
+            printf ("bound      = %.5f +/- %.5f\n", 100.0 - 100.0/(1.0 + FIT(0)), 1.0);
+        }
+        else if (p == 2) {
+            printf("\nchisq/dof = %g\n",  pow(chi, 2.0) / dof);
+            printf ("kon        = %.5f +/- %.5f\n", FIT(0), c*ERR(0));
+            printf ("kon conf   = +/- %.5f %.5f %.5f\n", c*ERR(0)*gsl_cdf_tdist_Pinv(0.95, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.975, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.99, dof));
+            printf ("koff       = %.5f +/- %.5f\n", FIT(1), c*ERR(1));
+            printf ("koff conf  = +/- %.5f %.5f %.5f\n", c*ERR(1)*gsl_cdf_tdist_Pinv(0.95, dof), c*ERR(1)*gsl_cdf_tdist_Pinv(0.975, dof), c*ERR(1)*gsl_cdf_tdist_Pinv(0.99, dof));
+            printf ("bound      = %.5f +/- %.5f\n", 100.0 - 100.0/(1.0 + FIT(0)/FIT(1)), 100.0*(c*ERR(0)/FIT(1) - FIT(0)*c*ERR(1)/FIT(1)/FIT(1))/(1.0 + FIT(0)/FIT(1))/(1.0 + FIT(0)/FIT(1)));
+        }
+        else {
+            fprintf(stderr, "ERROR: in main: Parameter p is neither 1 nor 2.\n");
+            exit(1);
+        }
     }
 
     printf ("\nSTATUS = %s\n\n", gsl_strerror (status));
 
     /* Writing the best fit */
     FILE *fit_curve = fopen(strcat(output_prefix, "_best_fit.dat"), "w");
-    for(i = 0; i < NELEMS_1D(best_fit); i++) {
-        //double t = i;
-        fprintf(fit_curve, "%f\n", invlap(time[i], FIT(0), FIT(1), Df, R, m, 0));
+    if (p == 1) {
+        for(i = 0; i < NELEMS_1D(best_fit); i++) {
+            fprintf(fit_curve, "%f\n", invlap_1(time[i], FIT(0), Df, R, m, 0));
+        }
+    }
+    else if (p == 2) {
+        for(i = 0; i < NELEMS_1D(best_fit); i++) {
+            fprintf(fit_curve, "%f\n", invlap_2(time[i], FIT(0), FIT(1), Df, R, m, 0));
+        }
+    }
+    else {
+        fprintf(stderr, "ERROR: in main: Parameter p is neither 1 nor 2.\n");
+        exit(1);
     }
     fclose(fit_curve);
 
