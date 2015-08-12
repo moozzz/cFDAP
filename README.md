@@ -13,8 +13,9 @@ read Igaev et al. (2015) Biophys. J. 107: 2567-2578).
 New
 ===
 
- * 12.08.2015: cFDAP now supports kinetic models with 1 and 2 fit parameters and
-   and calculates 95%, 97.5% and 99.9% confidence intervals!
+ * 12.08.2015
+   cFDAP now supports kinetic models with 1 and 2 fit parameters and and
+   calculates 95%, 97.5% and 99.9% confidence intervals!
 
 Compilation
 ===========
