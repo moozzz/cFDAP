@@ -174,7 +174,7 @@ double
 invlap_1(double t, double xx, double Df, double R, char *m, int functionOrDerivative) {
     /* defining constants */
     int i, n_int = 10000;
-    double omega = 200.0, sigma = 0.05, delta = omega/((double) n_int);
+    double omega = 200.0, sig = 0.05, delta = omega/((double) n_int);
     double sum = 0.0, wi = 0.0, wf, fi, ff;
     double complex witi, wfti; 
 
@@ -198,20 +198,20 @@ invlap_1(double t, double xx, double Df, double R, char *m, int functionOrDeriva
         wf = wi + delta;
         wfti = 0.0 + (wf*t)*I;
 
-        fi = creal(cexp(witi)*laplace_fun(sigma + wi*I, xx, Df, R));
-        ff = creal(cexp(wfti)*laplace_fun(sigma + wf*I, xx, Df, R));
+        fi = creal(cexp(witi)*laplace_fun(sig + wi*I, xx, Df, R));
+        ff = creal(cexp(wfti)*laplace_fun(sig + wf*I, xx, Df, R));
         sum += 0.5*(wf - wi)*(fi + ff);
         wi = wf;
     }
 
-    return creal(sum*cexp(sigma*t)/M_PI);
+    return creal(sum*cexp(sig*t)/M_PI);
 }
 
 double
 invlap_2(double t, double kon, double koff, double Df, double R, char *m, int functionOrDerivative) {
     /* defining constants */
     int i, n_int = 10000;
-    double omega = 200.0, sigma = 0.05, delta = omega/((double) n_int);
+    double omega = 200.0, sig = 0.05, delta = omega/((double) n_int);
     double sum = 0.0, wi = 0.0, wf, fi, ff;
     double complex witi, wfti; 
 
@@ -266,13 +266,13 @@ invlap_2(double t, double kon, double koff, double Df, double R, char *m, int fu
         wf = wi + delta;
         wfti = 0.0 + (wf*t)*I;
 
-        fi = creal(cexp(witi)*laplace_fun(sigma + wi*I, kon, koff, Df, R));
-        ff = creal(cexp(wfti)*laplace_fun(sigma + wf*I, kon, koff, Df, R));
+        fi = creal(cexp(witi)*laplace_fun(sig + wi*I, kon, koff, Df, R));
+        ff = creal(cexp(wfti)*laplace_fun(sig + wf*I, kon, koff, Df, R));
         sum += 0.5*(wf - wi)*(fi + ff);
         wi = wf;
     }
 
-    return creal(sum*cexp(sigma*t)/M_PI);
+    return creal(sum*cexp(sig*t)/M_PI);
 }
 
 int
@@ -300,6 +300,7 @@ model_f (const gsl_vector * x, void *data,
         for (i = 0; i < n; i++) {
             /* Model Yi = A * exp(-lambda * i) + b */
             //double Yi = A * exp (-lambda * t) + b;
+            
             double Yi = inverted_fun(time[i], xx, Df, R, m, 0);
             gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
         }
@@ -315,6 +316,7 @@ model_f (const gsl_vector * x, void *data,
         for (i = 0; i < n; i++) {
             /* Model Yi = A * exp(-lambda * i) + b */
             //double Yi = A * exp (-lambda * t) + b;
+
             double Yi = inverted_fun(time[i], kon, koff, Df, R, m, 0);
             gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
         }
@@ -656,6 +658,7 @@ main(int argc, char *argv[]) {
         exit(1);
     }
 
+    /* Solver initialization */
     double time[n], y[n], sigma[n], best_fit[n];
     double stepSize = (t_end - t_ini)/(double) (n - 1);
     const gsl_multifit_fdfsolver_type *T;
@@ -689,19 +692,31 @@ main(int argc, char *argv[]) {
     double temp1, temp2;
     FILE *input_curve = fopen(curve_name, "r");
     FILE *error_curve = fopen(std_name, "r");
+    printf("Opening the curve and error files...\n");
+    if(input_curve == NULL) {
+        fprintf(stderr, "ERROR: input_curve file cannot be opened.\n");
+        fprintf(stderr, "ERROR: Probably, cFDAP and input_curve must be in the same folder.\n");
+        exit(1);
+    }
+    if(error_curve == NULL) {
+        fprintf(stderr, "ERROR: error_curve file cannot be opened.\n");
+        fprintf(stderr, "ERROR: Probably, cFDAP and error_curve must be in the same folder.\n");
+        exit(1);
+    }
     for(i = 0; i < NELEMS_1D(y); i++) {
         time[i] = t_ini + (double) i*stepSize;
         fscanf(input_curve, "%lf", &temp1);
         fscanf(error_curve, "%lf", &temp2);
         y[i] = temp1;
         sigma[i] = temp2;
-        /*printf("data: %f %g %g\n", time[i], y[i], sigma[i]);*/
+        //printf("data: %f %g %g\n", time[i], y[i], sigma[i]);
     }
     if(time[0] == 0.0) time[0] = 0.01;
     fclose(input_curve);
     fclose(error_curve);
+    printf("Successful reading.\n\n");
 
-    /* Initializing the solver */
+    /* Starting interations for the solver */
     T = gsl_multifit_fdfsolver_lmsder;
     s = gsl_multifit_fdfsolver_alloc (T, n, p);
     gsl_multifit_fdfsolver_set (s, &f, &x.vector);

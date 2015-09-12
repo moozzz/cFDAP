@@ -13,6 +13,11 @@ read Igaev et al. (2015) Biophys. J. 107: 2567-2578).
 New
 ===
 
+ * 13.09.2015
+
+   Several bugs have been fixed. From now on, cFDAP and curve/error files
+   must be located in the same folder.
+
  * 12.08.2015
 
    cFDAP now supports kinetic models with 1 and 2 fit parameters and
