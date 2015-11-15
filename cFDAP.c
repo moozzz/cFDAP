@@ -104,7 +104,7 @@ fullModel_koff(double complex s, double kon, double koff, double Df, double R) {
 
 double complex
 effectiveDiffusion(double complex s, double xx, double Df, double R) {
-    /* x = kon/koff */
+    /* xx = kon/koff */
     return 1.0/s - 1.0/2.0/s/csqrt(R*R*s*(1.0 + xx)/Df)*(1.0 - cexp(-2.0*csqrt(R*R*s*(1.0 + xx)/Df)));
 }
 
@@ -302,7 +302,10 @@ model_f (const gsl_vector * x, void *data,
             //double Yi = A * exp (-lambda * t) + b;
             
             double Yi = inverted_fun(time[i], xx, Df, R, m, 0);
-            gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+            //TODO: implement an option to choose between
+            //      weighted and unweighted fitting
+            //gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+            gsl_vector_set (f, i, (Yi - y[i]));
         }
     }
     else if (p == 2) {
@@ -318,15 +321,16 @@ model_f (const gsl_vector * x, void *data,
             //double Yi = A * exp (-lambda * t) + b;
 
             double Yi = inverted_fun(time[i], kon, koff, Df, R, m, 0);
-            gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+            //TODO: implement an option to choose between
+            //      weighted and unweighted fitting
+            //gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+            gsl_vector_set (f, i, (Yi - y[i]));
         }
     }
     else {
         fprintf(stderr, "ERROR: in 'model_f': Parameter p is neither 1 nor 2.\n");
         exit(1);
     }
-
-
 
     return GSL_SUCCESS;
 }
@@ -358,7 +362,10 @@ model_df(const gsl_vector * x, void *data,
             /*       Yi = A * exp(-lambda * i) + b  */
             /* and the xj are the parameters (A,lambda,b) */
 
-            gsl_matrix_set (J, i, 0, inverted_fun(time[i], xx, Df, R, m, 1)/sigma[i]);
+            //TODO: implement an option to choose between
+            //      weighted and unweighted fitting
+            //gsl_matrix_set (J, i, 0, inverted_fun(time[i], xx, Df, R, m, 1)/sigma[i]);
+            gsl_matrix_set (J, i, 0, inverted_fun(time[i], xx, Df, R, m, 1));
         }
     }
     else if (p == 2) {
@@ -375,8 +382,12 @@ model_df(const gsl_vector * x, void *data,
             /*       Yi = A * exp(-lambda * i) + b  */
             /* and the xj are the parameters (A,lambda,b) */
 
-            gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1)/sigma[i]);
-            gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2)/sigma[i]);
+            //TODO: implement an option to choose between
+            //      weighted and unweighted fitting
+            //gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1)/sigma[i]);
+            //gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2)/sigma[i]);
+            gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1));
+            gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2));
         }
     }
     else {
@@ -473,8 +484,8 @@ main(int argc, char *argv[]) {
     fprintf(stderr, "  --------------   cFDAP 0.1.0 (C) 2015\n");
     fprintf(stderr, "  |*    cFDAP  |   Authors: Maxim Igaev, Frederik Sündermann\n");
     fprintf(stderr, "  | *          |   cFDAP is a fitting program for FDAP data\n");
-    fprintf(stderr, "  |  **        |   http://www.neurobiologie.uni-osnabrueck.de/\n");
-    fprintf(stderr, "  |    ********|   https://github.com/moozzz\n");
+    fprintf(stderr, "  |  ***       |   http://www.neurobiologie.uni-osnabrueck.de/\n");
+    fprintf(stderr, "  |     *******|   https://github.com/moozzz\n");
     fprintf(stderr, "  --------------   Email: maxim.igaev@biologie.uni-osnabrueck.de\n");
     fprintf(stderr, "\n");
 
@@ -739,14 +750,19 @@ main(int argc, char *argv[]) {
     while (status == GSL_CONTINUE && iter < 500);
 
     gsl_multifit_covar (s->J, 0.0, covar);
+    
+    double chi = gsl_blas_dnrm2(s->f);
+    double dof = n - p;
+    //double c = GSL_MAX_DBL(1, chi / sqrt(dof));
+    double c = 1.0;
 
 #define FIT(i) gsl_vector_get(s->x, i)
-#define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
+#define ERR(i) sqrt(gsl_matrix_get(covar,i,i))*pow(chi, 2.0)/dof
 
     {
-        double chi = gsl_blas_dnrm2(s->f);
-        double dof = n - p;
-        double c = GSL_MAX_DBL(1, chi / sqrt(dof));
+        //double chi = gsl_blas_dnrm2(s->f);
+        //double dof = n - p;
+        //double c = GSL_MAX_DBL(1, chi / sqrt(dof));
 
         if (p == 1) {
             printf("\nchisq/dof = %g\n",  pow(chi, 2.0) / dof);
@@ -766,12 +782,35 @@ main(int argc, char *argv[]) {
             fprintf(stderr, "ERROR: in main: Parameter p is neither 1 nor 2.\n");
             exit(1);
         }
+
+        /* Writing the fit parameters */
+        FILE *fit_params = fopen(strcat(output_prefix, "_fit_params.dat"), "w");
+        if (p == 1) {
+            fprintf(fit_params, "chisq/dof %g\n", pow(chi, 2.0) / dof);
+            fprintf(fit_params, "x_fit %.5f\n", FIT(0));
+            fprintf(fit_params, "x_error %.5f\n", c*ERR(0));
+            fprintf(fit_params, "bound %.5f\n", 100.0 - 100.0/(1.0 + FIT(0)));
+        }
+        else if (p == 2) {
+            fprintf(fit_params, "chisq/dof %g\n", pow(chi, 2.0) / dof);
+            fprintf(fit_params, "kon_fit %.5f\n", FIT(0));
+            fprintf(fit_params, "kon_error %.5f\n", c*ERR(0));
+            fprintf(fit_params, "koff_fit %.5f\n", FIT(1));
+            fprintf(fit_params, "koff_error %.5f\n", c*ERR(1));
+            fprintf(fit_params, "bound %.5f\n", 100.0 - 100.0/(1.0 + FIT(0)/FIT(1)));
+            fprintf(fit_params, "bound_error %.5f\n", 100.0*(c*ERR(0)/FIT(1) - FIT(0)*c*ERR(1)/FIT(1)/FIT(1))/(1.0 + FIT(0)/FIT(1))/(1.0 + FIT(0)/FIT(1)));
+        }
+        else {
+            fprintf(stderr, "ERROR: in main: Parameter p is neither 1 nor 2.\n");
+            exit(1);
+        }
+        fclose(fit_params);
     }
 
     printf ("\nSTATUS = %s\n\n", gsl_strerror (status));
 
     /* Writing the best fit */
-    FILE *fit_curve = fopen(strcat(output_prefix, "_best_fit.dat"), "w");
+    /*FILE *fit_curve = fopen(strcat(output_prefix, "_best_fit.dat"), "w");
     if (p == 1) {
         for(i = 0; i < NELEMS_1D(best_fit); i++) {
             fprintf(fit_curve, "%f\n", invlap_1(time[i], FIT(0), Df, R, m, 0));
@@ -786,7 +825,7 @@ main(int argc, char *argv[]) {
         fprintf(stderr, "ERROR: in main: Parameter p is neither 1 nor 2.\n");
         exit(1);
     }
-    fclose(fit_curve);
+    fclose(fit_curve);*/
 
     gsl_multifit_fdfsolver_free (s);
     gsl_matrix_free (covar);
