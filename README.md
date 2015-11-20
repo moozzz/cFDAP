@@ -21,7 +21,13 @@ New
  * 12.08.2015
 
    cFDAP now supports kinetic models with 1 and 2 fit parameters and
-   calculates 95%, 97.5% and 99.9% confidence intervals!
+   calculates 95%, 97.5% and 99.9% confidence intervals.
+
+Requirements
+============
+
+ To successfully compile cFDAP you need to install the GNU Scientific Library
+(http://www.gnu.org/software/gsl/).
 
 Compilation
 ===========
@@ -38,12 +44,6 @@ Usage
  ./cFDAP
  ```
 
-Requirements
-============
-
- To successfully compile cFDAP you need to install the GNU Scientific Library
-(http://www.gnu.org/software/gsl/).
-
 Copying
 ======
 
@@ -53,6 +53,7 @@ allowed under the same terms.
 TODO
 ====
 
+ * implement weighted and unweighted fitting (via an additional option)
  * statically linked GSL
  * cFDAP version for Windows 7
  * a simple GUI (preferably a Fiji plugin)
