@@ -466,8 +466,9 @@ bad_input(void) {
 int
 main(int argc, char *argv[]) {
 
-    int i, status;
+    int i, status, info;
     unsigned int iter = 0;
+    double chi, chi0;
 
     /* DEFAULTS */
     char m[80];
@@ -511,7 +512,7 @@ main(int argc, char *argv[]) {
                 p = 2;
             }
             else if(strcmp(argv[2], "effectiveDiffusion") == 0) {
-                strcpy(m, argv[2]);
+                    strcpy(m, argv[2]);
                 p = 1;
             }
             else {
@@ -672,8 +673,11 @@ main(int argc, char *argv[]) {
     /* Solver initialization */
     double time[n], y[n], sigma[n], best_fit[n];
     double stepSize = (t_end - t_ini)/(double) (n - 1);
-    const gsl_multifit_fdfsolver_type *T;
+    const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
     gsl_multifit_fdfsolver *s;
+    gsl_vector *res_f;
+
+    gsl_matrix *J = gsl_matrix_alloc(n, p); /* Jacobian matrix */
     gsl_matrix *covar = gsl_matrix_alloc (p, p); /* Covariance matrix */
 
     struct data d = { n, Df, R, time, y, sigma, m, p };
@@ -725,15 +729,25 @@ main(int argc, char *argv[]) {
     if(time[0] == 0.0) time[0] = 0.01;
     fclose(input_curve);
     fclose(error_curve);
-    printf("Successful reading.\n\n");
+    printf("Successfully read in.\n\n");
 
-    /* Starting interations for the solver */
-    T = gsl_multifit_fdfsolver_lmsder;
+    /* Allocating a new instance for the solver */
     s = gsl_multifit_fdfsolver_alloc (T, n, p);
+
+    /* Initializing a solver with a starting point */
     gsl_multifit_fdfsolver_set (s, &f, &x.vector);
 
-    print_state (iter, s, p);
+    /* Computing the initial residual norm */
+    res_f = gsl_multifit_fdfsolver_residual(s);
+    chi0 = gsl_blas_dnrm2(res_f);
 
+    /* Solving the system with a maximum of 500 iterations */
+    //const double xtol = 1e-8;
+    //const double gtol = 1e-8;
+    //const double ftol = 0.0;
+    //status = gsl_multifit_fdfsolver_driver(s, 500, xtol, gtol, ftol, &info);
+
+    //TODO: add a -v option to control the output
     do {
         iter++;
         status = gsl_multifit_fdfsolver_iterate (s);
@@ -748,30 +762,42 @@ main(int argc, char *argv[]) {
         status = gsl_multifit_test_delta (s->dx, s->x, 1e-4, 1e-4);
     }
     while (status == GSL_CONTINUE && iter < 500);
+    print_state (iter, s, p);
 
-    gsl_multifit_covar (s->J, 0.0, covar);
+    /* Computing the Jacobian and covariace matrix */
+    gsl_multifit_fdfsolver_jac(s, J);
+    gsl_multifit_covar (J, 0.0, covar);
+
+    /* Computing the final residual norm */
+    chi = gsl_blas_dnrm2(res_f);
     
-    double chi = gsl_blas_dnrm2(s->f);
-    double dof = n - p;
-    //double c = GSL_MAX_DBL(1, chi / sqrt(dof));
-    double c = 1.0;
-
 #define FIT(i) gsl_vector_get(s->x, i)
 #define ERR(i) sqrt(gsl_matrix_get(covar,i,i))*pow(chi, 2.0)/dof
+//TODO: add an option to choose weighted/unweighted
+//#define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
+
+    printf("Summary from method '%s':\n", gsl_multifit_fdfsolver_name(s));
+    printf("Number of iterations done: %zu\n", gsl_multifit_fdfsolver_niter(s));
+    printf("Function evaluations: %zu\n", f.nevalf);
+    printf("Jacobian evaluations: %zu\n", f.nevaldf);
+    printf("Reason for stopping: %s\n", (info == 1) ? "small step size" : "small gradient");
+    printf("Initial |f(x)| = %g\n", chi0);
+    printf("Final |f(x)| = %g\n", chi);
 
     {
-        //double chi = gsl_blas_dnrm2(s->f);
-        //double dof = n - p;
+        double dof = n - p;
+        double c = 1.0;
+        //TODO: add an option to choose weighted/unweighted
         //double c = GSL_MAX_DBL(1, chi / sqrt(dof));
 
+        printf("chisq/dof = %g\n", pow(chi, 2.0)/dof);
+
         if (p == 1) {
-            printf("\nchisq/dof = %g\n",  pow(chi, 2.0) / dof);
             printf ("x          = %.5f +/- %.5f\n", FIT(0), c*ERR(0));
             printf ("x conf     = +/- %.5f %.5f %.5f\n", c*ERR(0)*gsl_cdf_tdist_Pinv(0.95, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.975, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.99, dof));
             printf ("bound      = %.5f +/- %.5f\n", 100.0 - 100.0/(1.0 + FIT(0)), 1.0);
         }
         else if (p == 2) {
-            printf("\nchisq/dof = %g\n",  pow(chi, 2.0) / dof);
             printf ("kon        = %.5f +/- %.5f\n", FIT(0), c*ERR(0));
             printf ("kon conf   = +/- %.5f %.5f %.5f\n", c*ERR(0)*gsl_cdf_tdist_Pinv(0.95, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.975, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.99, dof));
             printf ("koff       = %.5f +/- %.5f\n", FIT(1), c*ERR(1));
@@ -809,6 +835,8 @@ main(int argc, char *argv[]) {
 
     printf ("\nSTATUS = %s\n\n", gsl_strerror (status));
 
+    /* TODO: Add a not mandatory option to
+     * enable writing the best fit to a file */
     /* Writing the best fit */
     /*FILE *fit_curve = fopen(strcat(output_prefix, "_best_fit.dat"), "w");
     if (p == 1) {
@@ -829,6 +857,7 @@ main(int argc, char *argv[]) {
 
     gsl_multifit_fdfsolver_free (s);
     gsl_matrix_free (covar);
+    gsl_matrix_free (J);
 
     return 0;
 }
