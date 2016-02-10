@@ -13,6 +13,10 @@ read Igaev et al. (2015) Biophys. J. 107: 2567-2578).
 New
 ===
 
+ * 09.02.2016
+
+   GSL 2.0 support has been implemented.
+
  * 13.09.2015
 
    Several bugs have been fixed. From now on, cFDAP and curve/error files
@@ -27,7 +31,9 @@ Requirements
 ============
 
  To successfully compile cFDAP you need to install the GNU Scientific Library
-(http://www.gnu.org/software/gsl/).
+(http://www.gnu.org/software/gsl/). For Ubuntu/Debian, one needs to install gsl-bin
+(binary package), libgsl2 (library package) and, optionally, libgsl-dev (development
+package).
 
 Compilation
 ===========
@@ -54,6 +60,6 @@ TODO
 ====
 
  * implement weighted and unweighted fitting (via an additional option)
- * statically linked GSL
+ * statically linked GSL 2.0
  * cFDAP version for Windows 7
  * a simple GUI (preferably a Fiji plugin)

@@ -110,7 +110,7 @@ effectiveDiffusion(double complex s, double xx, double Df, double R) {
 
 double complex
 effectiveDiffusion_xx(double complex s, double xx, double Df, double R) {
-    /* x = kon/koff */
+    /* xx = kon/koff */
     return (1.0 - (1.0 + 2.0*csqrt(s*R*R/Df*(1.0 + xx)))*cexp(-2.0*csqrt(s*R*R/Df*(1.0 + xx))))/(4.0*s*(1.0 + xx)*csqrt(s*R*R/Df*(1.0 + xx)));
 }
 
@@ -466,7 +466,7 @@ bad_input(void) {
 int
 main(int argc, char *argv[]) {
 
-    int i, status, info;
+    int i, status;
     unsigned int iter = 0;
     double chi, chi0;
 
@@ -560,7 +560,7 @@ main(int argc, char *argv[]) {
             x_init_1[0] = atof(argv[i + 1]);
             i++;
             if(x_init_1[0] < 0.0) {
-                fprintf(stderr, "ERROR: Would a negative x make sense?\n\n");
+                fprintf(stderr, "ERROR: Would a negative x = kon/koff make sense?\n\n");
                 exit(1);
             }
         }
@@ -674,9 +674,9 @@ main(int argc, char *argv[]) {
     double time[n], y[n], sigma[n], best_fit[n];
     double stepSize = (t_end - t_ini)/(double) (n - 1);
     const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
+    
     gsl_multifit_fdfsolver *s;
     gsl_vector *res_f;
-
     gsl_matrix *J = gsl_matrix_alloc(n, p); /* Jacobian matrix */
     gsl_matrix *covar = gsl_matrix_alloc (p, p); /* Covariance matrix */
 
@@ -734,7 +734,7 @@ main(int argc, char *argv[]) {
     /* Allocating a new instance for the solver */
     s = gsl_multifit_fdfsolver_alloc (T, n, p);
 
-    /* Initializing a solver with a starting point */
+    /* Initializing a solver with a starting point x */
     gsl_multifit_fdfsolver_set (s, &f, &x.vector);
 
     /* Computing the initial residual norm */
@@ -742,12 +742,8 @@ main(int argc, char *argv[]) {
     chi0 = gsl_blas_dnrm2(res_f);
 
     /* Solving the system with a maximum of 500 iterations */
-    //const double xtol = 1e-8;
-    //const double gtol = 1e-8;
-    //const double ftol = 0.0;
-    //status = gsl_multifit_fdfsolver_driver(s, 500, xtol, gtol, ftol, &info);
-
     //TODO: add a -v option to control the output
+    print_state (iter, s, p);
     do {
         iter++;
         status = gsl_multifit_fdfsolver_iterate (s);
@@ -762,7 +758,6 @@ main(int argc, char *argv[]) {
         status = gsl_multifit_test_delta (s->dx, s->x, 1e-4, 1e-4);
     }
     while (status == GSL_CONTINUE && iter < 500);
-    print_state (iter, s, p);
 
     /* Computing the Jacobian and covariace matrix */
     gsl_multifit_fdfsolver_jac(s, J);
@@ -776,11 +771,10 @@ main(int argc, char *argv[]) {
 //TODO: add an option to choose weighted/unweighted
 //#define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
 
-    printf("Summary from method '%s':\n", gsl_multifit_fdfsolver_name(s));
+    printf("\nSummary from method '%s':\n", gsl_multifit_fdfsolver_name(s));
     printf("Number of iterations done: %zu\n", gsl_multifit_fdfsolver_niter(s));
     printf("Function evaluations: %zu\n", f.nevalf);
     printf("Jacobian evaluations: %zu\n", f.nevaldf);
-    printf("Reason for stopping: %s\n", (info == 1) ? "small step size" : "small gradient");
     printf("Initial |f(x)| = %g\n", chi0);
     printf("Final |f(x)| = %g\n", chi);
 
