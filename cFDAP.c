@@ -844,8 +844,6 @@ main(int argc, char *argv[]) {
     printf("Jacobian evaluations: %zu\n", f.nevaldf);
     printf("Initial |f(x)| = %g\n", chi0);
     printf("Final |f(x)| = %g\n", chi);
-    printf("Error kon = %g\n", ERR(0));
-    printf("Error koff = %g\n", ERR(1));
 
     {
         //TODO: add an option to choose weighted/unweighted
