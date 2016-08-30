@@ -13,24 +13,29 @@ read Igaev et al. (2015) Biophys. J. 107: 2567-2578).
 New
 ===
 
+ * 30.08.2016
+
+    A new option "-w" has been introduced which allows the user to choose
+    between weighted and unweighted fitting.
+
  * 09.02.2016
 
-   GSL 2.0 support has been implemented.
+    GSL 2.0 support has been implemented.
 
  * 13.09.2015
 
-   Several bugs have been fixed. From now on, cFDAP and curve/error files
-   must be located in the same folder.
+    Several bugs have been fixed. From now on, cFDAP and curve/error files
+    must be located in the same folder.
 
  * 12.08.2015
 
-   cFDAP now supports kinetic models with 1 and 2 fit parameters and
-   calculates 95%, 97.5% and 99.9% confidence intervals.
+    cFDAP now supports kinetic models with 1 and 2 fit parameters and
+    calculates 95%, 97.5% and 99.9% confidence intervals.
 
 Requirements
 ============
 
- To successfully compile cFDAP you need to install the GNU Scientific Library
+ To successfully compile cFDAP, you need to install the GNU Scientific Library
 (http://www.gnu.org/software/gsl/). For Ubuntu/Debian, one needs to install gsl-bin
 (binary package), libgsl2 (library package) and, optionally, libgsl-dev (development
 package).
@@ -59,7 +64,6 @@ allowed under the same terms.
 TODO
 ====
 
- * implement weighted and unweighted fitting (via an additional option)
  * statically linked GSL 2.0
  * cFDAP version for Windows 7
  * a simple GUI (preferably a Fiji plugin)

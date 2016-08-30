@@ -31,6 +31,7 @@
 #define DEFAULT_KON_INIT 0.5 /* Starting value for kon */
 #define DEFAULT_KOFF_INIT 0.5 /* Starting value for koff */
 #define DEFAULT_XX_INIT 1.0 /* Starting value for xx = kon/koff */
+#define DEFAULT_FLAG_WEIGHT 0 /* By default, fitting is unweighted */
 
 /* MACROS */
 #define NELEMS_1D(x) (sizeof(x)/sizeof((x)[0]))
@@ -48,9 +49,13 @@ struct data {
     double * sigma;
     char * m;
     size_t p;
+    size_t w_flag;
 };
 
 /* FUNCTION DECLARATIONS */
+/* Functions with the '_x', '_kon' or '_koff' indeces are
+ * derivatives of those functions with respect to '_x',
+ * '_kon' and '_koff', respectively */
 double complex fullModel(double complex s, double kon,
                          double koff, double Df, double R);
 double complex fullModel_kon(double complex s, double kon,
@@ -169,7 +174,7 @@ hybridModel_koff(double complex s, double kon, double koff, double Df, double R)
    1999 (found at http://www.eng.usouthal.edu/huddleston/
    SoftwareSupport/Download/Inversion99.doc)
   
-   Modified by Maxim Igaev, 2015 */
+   Modified and translated into C code by Maxim Igaev, 2015 */
 double
 invlap_1(double t, double xx, double Df, double R, char *m, int functionOrDerivative) {
     /* defining constants */
@@ -286,6 +291,7 @@ model_f (const gsl_vector * x, void *data,
     double *sigma = ((struct data *) data)->sigma;
     char *m = ((struct data *) data)->m;
     size_t p = ((struct data *)data)->p;
+    size_t w_flag = ((struct data *)data)->w_flag;
 
     size_t i;
     double xx, kon, koff;
@@ -302,10 +308,16 @@ model_f (const gsl_vector * x, void *data,
             //double Yi = A * exp (-lambda * t) + b;
             
             double Yi = inverted_fun(time[i], xx, Df, R, m, 0);
-            //TODO: implement an option to choose between
-            //      weighted and unweighted fitting
-            //gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
-            gsl_vector_set (f, i, (Yi - y[i]));
+            if (w_flag == 0) {
+                gsl_vector_set (f, i, (Yi - y[i]));
+            }
+            else if (w_flag == 1) {
+                gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+            }
+            else {
+                fprintf(stderr, "ERROR: in 'model_f': Parameter w_flag is neither 0 nor 1.\n");
+                exit(1);
+            }
         }
     }
     else if (p == 2) {
@@ -321,10 +333,16 @@ model_f (const gsl_vector * x, void *data,
             //double Yi = A * exp (-lambda * t) + b;
 
             double Yi = inverted_fun(time[i], kon, koff, Df, R, m, 0);
-            //TODO: implement an option to choose between
-            //      weighted and unweighted fitting
-            //gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
-            gsl_vector_set (f, i, (Yi - y[i]));
+            if (w_flag == 0) {
+                gsl_vector_set (f, i, (Yi - y[i]));
+            }
+            else if (w_flag == 1) {
+                gsl_vector_set (f, i, (Yi - y[i])/sigma[i]);
+            }
+            else {
+                fprintf(stderr, "ERROR: in 'model_f': Parameter w_flag is neither 0 nor 1.\n");
+                exit(1);
+            }
         }
     }
     else {
@@ -345,6 +363,7 @@ model_df(const gsl_vector * x, void *data,
     double *sigma = ((struct data *) data)->sigma;
     char *m = ((struct data *) data)->m;
     size_t p = ((struct data *)data)->p;
+    size_t w_flag = ((struct data *)data)->w_flag;
 
     size_t i;
     double xx, kon, koff;
@@ -362,10 +381,17 @@ model_df(const gsl_vector * x, void *data,
             /*       Yi = A * exp(-lambda * i) + b  */
             /* and the xj are the parameters (A,lambda,b) */
 
-            //TODO: implement an option to choose between
-            //      weighted and unweighted fitting
-            //gsl_matrix_set (J, i, 0, inverted_fun(time[i], xx, Df, R, m, 1)/sigma[i]);
-            gsl_matrix_set (J, i, 0, inverted_fun(time[i], xx, Df, R, m, 1));
+            if (w_flag == 0) {
+                gsl_matrix_set (J, i, 0, inverted_fun(time[i], xx, Df, R, m, 1));
+            }
+            else if (w_flag == 1)
+            {
+                gsl_matrix_set (J, i, 0, inverted_fun(time[i], xx, Df, R, m, 1)/sigma[i]);
+            }
+            else {
+                fprintf(stderr, "ERROR: in 'model_df': Parameter w_flag is neither 0 nor 1.\n");
+                exit(1);
+            }
         }
     }
     else if (p == 2) {
@@ -382,12 +408,18 @@ model_df(const gsl_vector * x, void *data,
             /*       Yi = A * exp(-lambda * i) + b  */
             /* and the xj are the parameters (A,lambda,b) */
 
-            //TODO: implement an option to choose between
-            //      weighted and unweighted fitting
-            //gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1)/sigma[i]);
-            //gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2)/sigma[i]);
-            gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1));
-            gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2));
+            if (w_flag == 0) {
+                gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1));
+                gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2));
+            }
+            else if (w_flag == 1) {
+                gsl_matrix_set (J, i, 0, inverted_fun(time[i], kon, koff, Df, R, m, 1)/sigma[i]);
+                gsl_matrix_set (J, i, 1, inverted_fun(time[i], kon, koff, Df, R, m, 2)/sigma[i]);
+            }
+            else {
+                fprintf(stderr, "ERROR: in 'model_df': Parameter w_flag is neither 0 nor 1.\n");
+                exit(1);
+            }
         }
     }
     else {
@@ -436,7 +468,7 @@ bad_input(void) {
     fprintf(stderr, "             [-r2 half_activation_area] [-tini initial_time]\n");
     fprintf(stderr, "             [-tend end_time] [-n numsteps]\n");
     fprintf(stderr, "             [-kon0 initial_kon] [-koff0 initial_koff]\n");
-    fprintf(stderr, "             [-x0 initial_x] [-i input]\n");
+    fprintf(stderr, "             [-x0 initial_x] [-w weights] [-i input]\n");
     fprintf(stderr, "             [-sd standard_deviation] [-o output]\n\n");
     fprintf(stderr, "  model_type:             reaction-diffusion model to fit with (mandatory parameter):\n");
     fprintf(stderr, "                          fullModel, hybridModel,\n");
@@ -449,8 +481,9 @@ bad_input(void) {
     fprintf(stderr, "  initial_x:              starting value for x = kon/koff (default: 1.0)\n");
     fprintf(stderr, "  initial_kon:            starting value for kon (default: 0.5)\n");
     fprintf(stderr, "  initial_koff:           starting value for koff (default: 0.5)\n");
+    fprintf(stderr, "  weights:                whether to use weiths (0 - no, 1 - yes, default: no)\n");
     fprintf(stderr, "  input:                  name of input curve file (mandatory)\n");
-    fprintf(stderr, "  standard_error:         name of input SD file (mandatory)\n");
+    fprintf(stderr, "  standard_error:         name of input SD file (mandatory if weights = yes)\n");
     fprintf(stderr, "  output:                 prefix name of output file (Example: -o tau441wt\n");
     fprintf(stderr, "                          makes cFDAP output 'tau441wt_fit_parameters.dat'\n");
     fprintf(stderr, "                          and 'tau441wt_fit_curve.dat')\n");
@@ -472,9 +505,10 @@ main(int argc, char *argv[]) {
 
     /* DEFAULTS */
     char m[80];
-    char curve_name[80], std_name[80], output_prefix[80];
+    char weights_name[1], curve_name[80], std_name[80], output_prefix[80];
     curve_name[0] = 0; std_name[0] = 0; output_prefix[0] = 0;
     size_t p;
+    size_t w_flag = DEFAULT_FLAG_WEIGHT;
     size_t n = DEFAULT_N;
     double Df = DEFAULT_DF, R = DEFAULT_R;
     double t_ini = DEFAULT_T_INI, t_end = DEFAULT_T_END;
@@ -483,14 +517,14 @@ main(int argc, char *argv[]) {
 
     fprintf(stderr, "\n");
     fprintf(stderr, "  --------------   cFDAP 0.1.0 (C) 2015\n");
-    fprintf(stderr, "  |*    cFDAP  |   Authors: Maxim Igaev, Frederik Sündermann\n");
+    fprintf(stderr, "  |*    cFDAP  |   Author: Maxim Igaev\n");
     fprintf(stderr, "  | *          |   cFDAP is a fitting program for FDAP data\n");
     fprintf(stderr, "  |  ***       |   http://www.neurobiologie.uni-osnabrueck.de/\n");
     fprintf(stderr, "  |     *******|   https://github.com/moozzz\n");
     fprintf(stderr, "  --------------   Email: maxim.igaev@biologie.uni-osnabrueck.de\n");
     fprintf(stderr, "\n");
 
-    if ((argc < 2) || (argc > 23)) {
+    if ((argc < 2) || (argc > 25)) {
         bad_input();
     }
 
@@ -632,6 +666,17 @@ main(int argc, char *argv[]) {
                 exit(1);
             }
         }
+        else if(strcmp(argv[i], "-w") == 0) {
+            if(i == argc - 1) {
+                fprintf(stderr, "ERROR: So, are you gonna use weights or not?\n\n");
+                exit(1);
+            }
+            w_flag = atof(argv[i + 1]);
+            i++;
+            if ( !(w_flag == 0 || w_flag == 1) ) {
+                fprintf(stderr, "ERROR: -w accepts only 0 (no) or 1 (yes) as arguments.\n\n");
+            }
+        }
         else if(strcmp(argv[i], "-i") == 0) {
             if(i == argc - 1) {
                 fprintf(stderr, "ERROR: No input curve files given.\n\n");
@@ -658,15 +703,23 @@ main(int argc, char *argv[]) {
         }
         else {
             if(strncmp(argv[i], "-", 1) == 0) {
-                fprintf(stderr, "\nERROR: Illegal option %s\n\n", argv[i]);
+                fprintf(stderr, "\nERROR: Illegal option %s.\n\n", argv[i]);
                 bad_input();
             }
         }
     }
 
     /* Checking whether input and output file names were given */
-    if (curve_name[0] == 0 || std_name[0] == 0 || output_prefix[0] == 0) {
-        fprintf(stderr, "ERROR: File input/output is not defined correctly\n\n");
+    char output_prefix_copy[80];
+    strcpy(output_prefix_copy, output_prefix);
+    if (curve_name[0] == 0 || output_prefix[0] == 0) {
+        fprintf(stderr, "ERROR: File input/output is not defined correctly.\n\n");
+        exit(1);
+    }
+
+    /* Checking whether std name was given if w_flag == 1 */
+    if (w_flag == 1 && std_name[0] == 0) {
+        fprintf(stderr, "ERROR: You want to use weighted fitting. Specify the std file.\n\n");
         exit(1);
     }
 
@@ -680,7 +733,7 @@ main(int argc, char *argv[]) {
     gsl_matrix *J = gsl_matrix_alloc(n, p); /* Jacobian matrix */
     gsl_matrix *covar = gsl_matrix_alloc (p, p); /* Covariance matrix */
 
-    struct data d = { n, Df, R, time, y, sigma, m, p };
+    struct data d = { n, Df, R, time, y, sigma, m, p, w_flag };
 
     gsl_multifit_function_fdf f;
     gsl_vector_view x;
@@ -703,36 +756,51 @@ main(int argc, char *argv[]) {
     f.p = p;
     f.params = &d;
 
-    /* Importing the data to be fitted */
-    double temp1, temp2;
+    /* Importing the FDAP curve to be fitted */
+    double temp;
     FILE *input_curve = fopen(curve_name, "r");
-    FILE *error_curve = fopen(std_name, "r");
-    printf("Opening the curve and error files...\n");
+    printf("Opening the curve file...\n");
     if(input_curve == NULL) {
         fprintf(stderr, "ERROR: input_curve file cannot be opened.\n");
         fprintf(stderr, "ERROR: Probably, cFDAP and input_curve must be in the same folder.\n");
         exit(1);
     }
-    if(error_curve == NULL) {
-        fprintf(stderr, "ERROR: error_curve file cannot be opened.\n");
-        fprintf(stderr, "ERROR: Probably, cFDAP and error_curve must be in the same folder.\n");
-        exit(1);
-    }
     for(i = 0; i < NELEMS_1D(y); i++) {
         time[i] = t_ini + (double) i*stepSize;
-        fscanf(input_curve, "%lf", &temp1);
-        fscanf(error_curve, "%lf", &temp2);
-        y[i] = temp1;
-        sigma[i] = temp2;
-        //printf("data: %f %g %g\n", time[i], y[i], sigma[i]);
+        fscanf(input_curve, "%lf", &temp);
+        y[i] = temp;
+        if (i < 5) printf("data: %f %g\n", time[i], y[i]);
     }
     if(time[0] == 0.0) time[0] = 0.01;
+    printf("Curve file has been successfully read in.\n\n");
     fclose(input_curve);
-    fclose(error_curve);
-    printf("Successfully read in.\n\n");
+
+    /* Importing the errors for the FDAP curve if w_flag == 1 */
+    if (w_flag == 1) {
+        FILE *error_curve = fopen(std_name, "r");
+        printf("Opening the error file...\n");
+        if(error_curve == NULL) {
+            fprintf(stderr, "ERROR: error_curve file cannot be opened.\n");
+            fprintf(stderr, "ERROR: Probably, cFDAP and error_curve must be in the same folder.\n");
+            exit(1);
+        }
+        for(i = 0; i < NELEMS_1D(y); i++) {
+            fscanf(error_curve, "%lf", &temp);
+            sigma[i] = temp;
+            if (i < 5) printf("data: %g\n", sigma[i]);
+        }
+        printf("Error file has been successfully read in.\n\n");
+        fclose(error_curve);
+    }
 
     /* Allocating a new instance for the solver */
     s = gsl_multifit_fdfsolver_alloc (T, n, p);
+    if (w_flag == 0) {
+        printf("Initializing '%s' solver with NO weights...\n\n", gsl_multifit_fdfsolver_name(s));
+    }
+    else {
+        printf("Initializing '%s' solver with weights...\n\n", gsl_multifit_fdfsolver_name(s));
+    }
 
     /* Initializing a solver with a starting point x */
     gsl_multifit_fdfsolver_set (s, &f, &x.vector);
@@ -766,10 +834,9 @@ main(int argc, char *argv[]) {
     /* Computing the final residual norm */
     chi = gsl_blas_dnrm2(res_f);
     
-#define FIT(i) gsl_vector_get(s->x, i)
-#define ERR(i) sqrt(gsl_matrix_get(covar,i,i))*pow(chi, 2.0)/dof
 //TODO: add an option to choose weighted/unweighted
-//#define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
+#define FIT(i) gsl_vector_get(s->x, i)
+#define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
 
     printf("\nSummary from method '%s':\n", gsl_multifit_fdfsolver_name(s));
     printf("Number of iterations done: %zu\n", gsl_multifit_fdfsolver_niter(s));
@@ -777,12 +844,13 @@ main(int argc, char *argv[]) {
     printf("Jacobian evaluations: %zu\n", f.nevaldf);
     printf("Initial |f(x)| = %g\n", chi0);
     printf("Final |f(x)| = %g\n", chi);
+    printf("Error kon = %g\n", ERR(0));
+    printf("Error koff = %g\n", ERR(1));
 
     {
-        double dof = n - p;
-        double c = 1.0;
         //TODO: add an option to choose weighted/unweighted
-        //double c = GSL_MAX_DBL(1, chi / sqrt(dof));
+        double dof = n - p;
+        double c = GSL_MAX_DBL(1, chi / sqrt(dof));
 
         printf("chisq/dof = %g\n", pow(chi, 2.0)/dof);
 
@@ -832,7 +900,7 @@ main(int argc, char *argv[]) {
     /* TODO: Add a not mandatory option to
      * enable writing the best fit to a file */
     /* Writing the best fit */
-    /*FILE *fit_curve = fopen(strcat(output_prefix, "_best_fit.dat"), "w");
+    FILE *fit_curve = fopen(strcat(output_prefix_copy, "_best_fit.dat"), "w");
     if (p == 1) {
         for(i = 0; i < NELEMS_1D(best_fit); i++) {
             fprintf(fit_curve, "%f\n", invlap_1(time[i], FIT(0), Df, R, m, 0));
@@ -847,7 +915,7 @@ main(int argc, char *argv[]) {
         fprintf(stderr, "ERROR: in main: Parameter p is neither 1 nor 2.\n");
         exit(1);
     }
-    fclose(fit_curve);*/
+    fclose(fit_curve);
 
     gsl_multifit_fdfsolver_free (s);
     gsl_matrix_free (covar);
