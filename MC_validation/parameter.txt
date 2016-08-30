@@ -1,9 +1,0 @@
-(V) ED: D = 1 µm2/s, k_on = 10 s-1, k_off = 10 s-1
-
-(V) RD: D = 15 µm2/s, k_on = 0.1 s-1, k_off = 0.05 s-1
-
-(V) HB: D = 4 µm2/s, k_on = 1.0 s-1, k_off = 0.01 s-1
-
-(V) PD: D = 10 µm2/s, k_on = 0.01 s-1, k_off = 10 s-1 
-
-See also Igaev et al., 2014 for details
