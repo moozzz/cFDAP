@@ -810,7 +810,6 @@ main(int argc, char *argv[]) {
     chi0 = gsl_blas_dnrm2(res_f);
 
     /* Solving the system with a maximum of 500 iterations */
-    //TODO: add a -v option to control the output
     print_state (iter, s, p);
     do {
         iter++;
@@ -834,7 +833,6 @@ main(int argc, char *argv[]) {
     /* Computing the final residual norm */
     chi = gsl_blas_dnrm2(res_f);
     
-//TODO: add an option to choose weighted/unweighted
 #define FIT(i) gsl_vector_get(s->x, i)
 #define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
 
@@ -846,7 +844,6 @@ main(int argc, char *argv[]) {
     printf("Final |f(x)| = %g\n", chi);
 
     {
-        //TODO: add an option to choose weighted/unweighted
         double dof = n - p;
         double c = GSL_MAX_DBL(1, chi / sqrt(dof));
 
@@ -895,8 +892,6 @@ main(int argc, char *argv[]) {
 
     printf ("\nSTATUS = %s\n\n", gsl_strerror (status));
 
-    /* TODO: Add a not mandatory option to
-     * enable writing the best fit to a file */
     /* Writing the best fit */
     FILE *fit_curve = fopen(strcat(output_prefix_copy, "_best_fit.dat"), "w");
     if (p == 1) {
