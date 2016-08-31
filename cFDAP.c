@@ -471,14 +471,15 @@ bad_input(void) {
     fprintf(stderr, "             [-x0 initial_x] [-w weights] [-i input]\n");
     fprintf(stderr, "             [-sd standard_deviation] [-o output]\n\n");
     fprintf(stderr, "  model_type:             reaction-diffusion model to fit with (mandatory parameter):\n");
-    fprintf(stderr, "                          fullModel, hybridModel,\n");
-    fprintf(stderr, "                          reactionDominantPure, effectiveDiffusion\n");
+    fprintf(stderr, "                          fullModel, hybridModel, reactionDominantPure\n");
+    fprintf(stderr, "                          effectiveDiffusion\n");
     fprintf(stderr, "  diffusion_constant:     diffusion constant of unbound proteins (default: 11.0 µm2/s)\n");
     fprintf(stderr, "  half_activation_area:   half length of the activation area (default: 3.0 µm)\n");
     fprintf(stderr, "  initial_time:           initial time in the curve duration range (default: 0.0 s)\n");
     fprintf(stderr, "  end_time:               end time in the curve duration range (default: 112.0 s)\n");
     fprintf(stderr, "  numsteps:               number of steps in the FDAP curve (default: 113)\n");
     fprintf(stderr, "  initial_x:              starting value for x = kon/koff (default: 1.0)\n");
+    fprintf(stderr, "                          IMPORTANT: use this parameter only with effectiveDiffusion\n");
     fprintf(stderr, "  initial_kon:            starting value for kon (default: 0.5)\n");
     fprintf(stderr, "  initial_koff:           starting value for koff (default: 0.5)\n");
     fprintf(stderr, "  weights:                whether to use weiths (0 - no, 1 - yes, default: no)\n");
@@ -521,7 +522,7 @@ main(int argc, char *argv[]) {
     fprintf(stderr, "  | *          |   cFDAP is a fitting program for FDAP data\n");
     fprintf(stderr, "  |  ***       |   http://www.neurobiologie.uni-osnabrueck.de/\n");
     fprintf(stderr, "  |     *******|   https://github.com/moozzz\n");
-    fprintf(stderr, "  --------------   Email: maxim.igaev@biologie.uni-osnabrueck.de\n");
+    fprintf(stderr, "  --------------   Email: max_igaev@yahoo.com\n");
     fprintf(stderr, "\n");
 
     if ((argc < 2) || (argc > 25)) {
