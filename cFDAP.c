@@ -873,14 +873,17 @@ main(int argc, char *argv[]) {
             fprintf(fit_params, "chisq/dof %g\n", pow(chi, 2.0) / dof);
             fprintf(fit_params, "x_fit %.5f\n", FIT(0));
             fprintf(fit_params, "x_error %.5f\n", c*ERR(0));
+            fprintf(fit_params, "x_conf_int %.5f %.5f %.5f\n", c*ERR(0)*gsl_cdf_tdist_Pinv(0.95, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.975, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.99, dof));
             fprintf(fit_params, "bound %.5f\n", 100.0 - 100.0/(1.0 + FIT(0)));
         }
         else if (p == 2) {
             fprintf(fit_params, "chisq/dof %g\n", pow(chi, 2.0) / dof);
             fprintf(fit_params, "kon_fit %.5f\n", FIT(0));
             fprintf(fit_params, "kon_error %.5f\n", c*ERR(0));
+            fprintf(fit_params, "kon_conf_int %.5f %.5f %.5f\n", c*ERR(0)*gsl_cdf_tdist_Pinv(0.95, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.975, dof), c*ERR(0)*gsl_cdf_tdist_Pinv(0.99, dof));
             fprintf(fit_params, "koff_fit %.5f\n", FIT(1));
             fprintf(fit_params, "koff_error %.5f\n", c*ERR(1));
+            fprintf(fit_params, "koff_conf_int %.5f %.5f %.5f\n", c*ERR(1)*gsl_cdf_tdist_Pinv(0.95, dof), c*ERR(1)*gsl_cdf_tdist_Pinv(0.975, dof), c*ERR(1)*gsl_cdf_tdist_Pinv(0.99, dof));
             fprintf(fit_params, "bound %.5f\n", 100.0 - 100.0/(1.0 + FIT(0)/FIT(1)));
             fprintf(fit_params, "bound_error %.5f\n", 100.0*(c*ERR(0)/FIT(1) - FIT(0)*c*ERR(1)/FIT(1)/FIT(1))/(1.0 + FIT(0)/FIT(1))/(1.0 + FIT(0)/FIT(1)));
         }
