@@ -868,7 +868,7 @@ main(int argc, char *argv[]) {
         }
 
         /* Writing the fit parameters */
-        FILE *fit_params = fopen(strcat(output_prefix, "_fit_params.dat"), "w");
+        FILE *fit_params = fopen(strcat(curve_name, "_fit_params.dat"), "w");
         if (p == 1) {
             fprintf(fit_params, "chisq/dof %g\n", pow(chi, 2.0) / dof);
             fprintf(fit_params, "x_fit %.5f\n", FIT(0));
@@ -897,7 +897,7 @@ main(int argc, char *argv[]) {
     printf ("\nSTATUS = %s\n\n", gsl_strerror (status));
 
     /* Writing the best fit */
-    FILE *fit_curve = fopen(strcat(output_prefix_copy, "_best_fit.dat"), "w");
+    FILE *fit_curve = fopen(strcat(curve_name, "_best_fit.dat"), "w");
     if (p == 1) {
         for(i = 0; i < NELEMS_1D(best_fit); i++) {
             fprintf(fit_curve, "%f\n", invlap_1(time[i], FIT(0), Df, R, m, 0));
