@@ -61,5 +61,3 @@ Copying
 cFDAP is licensed under a GPL license. That means that distributing the code is only
 allowed under the same terms. 
 
-Test.
-
