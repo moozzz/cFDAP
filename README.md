@@ -58,12 +58,6 @@ Usage
 Copying
 ======
 
- cFDAP is licensed under a GPL license. That means that distributing the code is only
+cFDAP is licensed under a GPL license. That means that distributing the code is only
 allowed under the same terms. 
 
-TODO
-====
-
- * statically linked GSL 2.0
- * cFDAP version for Windows 7
- * a simple GUI (preferably a Fiji plugin)
