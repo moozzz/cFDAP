@@ -5,6 +5,10 @@ cFDAP is a command-line Linux tool for fitting FRAP/FDAP curves.
 
 The overall goal of cFDAP is to provide a fast and robust way to extract kinetic parameters from FRAP/FDAP curves gathered from outgrowths of living neuronal cells. Nevetheless, the code can be relatively simply adapted to any experiment outline, which, in turn, requires theoretical expressions for `FRAP(t)` or `FDAP(t)` signals be hardcoded explicitly (please read [Igaev et al. (2014) Biophys. J. 107: 2567-2578](https://doi.org/10.1016/j.bpj.2014.09.016) for more details and cite it when using the code).
 
+<div align="center">
+  <img src="cFDAP_image.jpg">
+</div>
+
 New
 ===
 
