@@ -1,5 +1,5 @@
-cFDAP v.0.1.0
-=============
+cFDAP
+=====
 
 cFDAP is a command-line Linux tool for fitting FRAP/FDAP curves.
 
@@ -9,8 +9,8 @@ The overall goal of cFDAP is to provide a fast and robust way to extract kinetic
   <img src="cFDAP_image.jpg" width="600">
 </div>
 
-New
-===
+Updates
+=======
 
  * 30.08.2016
 
